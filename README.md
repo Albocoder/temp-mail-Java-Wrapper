@@ -1,4 +1,5 @@
-# temp-mail-Java-API
+# temp-mail
+# Java-API
 This repository is a wrapper of temp-mail API for Java.
 <hr>
 It is still in development step! Use at your own risk! 
