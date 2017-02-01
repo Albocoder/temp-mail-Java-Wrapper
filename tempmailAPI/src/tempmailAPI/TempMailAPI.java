@@ -31,6 +31,7 @@ public class TempMailAPI {
 	private String email;
 	private HashMap<String,String> domainOfSourceRelation;
 	private HashMap<String,Message> allMessages;
+	private ArrayList<String> orderedMessages;
 	
 	//Constants 
 	private final int MAX_CHAR = 60;
@@ -40,6 +41,7 @@ public class TempMailAPI {
 		//initializing data
 		domains = new ArrayList<String>();
 		sources = new ArrayList<URL>();
+		orderedMessages = new ArrayList<String>();
 		randomSet = "0123456789abcdefghijklmnopqrstuvwxyz!#$%&'*+-/=?^`{|}~";
 		domainOfSourceRelation = new HashMap<String,String>(); 
 		allMessages = new HashMap<String,Message>();
@@ -71,15 +73,20 @@ public class TempMailAPI {
 		//System.out.println(deleteMessageOnline("ecf17fcb4e9274b181866ce610d46052"));
 	}
 	
-	//TODO: retrieve any message or all!
-	public boolean deleteMessageOnline(String id){
-		return deleteMsg(id,true);
-	}
-	public boolean deleteMessageTotally(String id){
-		return deleteMsg(id,false);
-	}
-	public boolean deleteMessageOffline(String id){
+	//TODO: Gotta test em' all!!
+	public ArrayList<Message> getAllMessages(){return new ArrayList<Message>(allMessages.values());}
+	public Message getMessage(String id){return allMessages.get(id);}
+	public Message getMessage(int index){return allMessages.get(orderedMessages.get(index));}
+	public Message getLastMesasage(){return getMessage(orderedMessages.size()-1);}
+	public boolean deleteMessageOnline(int index){return deleteMessageRemotely(orderedMessages.get(index));}
+	public boolean deleteMessageLocally(int index){return deleteMessageLocally(orderedMessages.get(index));}
+	public boolean deleteMessageTotally(int index){return deleteMessageTotally(orderedMessages.get(index));}
+	public boolean deleteMessageRemotely(String id){return deleteMsg(id,true);}
+	public boolean deleteMessageTotally(String id){return deleteMsg(id,false);}
+	
+	public boolean deleteMessageLocally(String id){
 		Message tmp = allMessages.remove(id);
+		orderedMessages.remove(id);
 		if(tmp==null&&allMessages.isEmpty())
 			return true;
 		else if (tmp!=null)
@@ -94,10 +101,14 @@ public class TempMailAPI {
 		try{
 			return tmp.deleteMsg();
 		}finally{
-			if(!onlyOnline)
+			if(!onlyOnline){
 				allMessages.remove(id);
+				orderedMessages.remove(id);
+			}
 		}
 	}
+	//END OF WHAT NEEDS TO BE TESTED
+	
 	//returns the number of new messages it gets
 	public int retrieveNewMessages(){
 		//https://api.temp-mail.ru/request/mail/id/75740c1865965424b79a4787b60a9a5f/
@@ -169,6 +180,7 @@ public class TempMailAPI {
 			allMessages.put(msgID, new Message(email,this.getEmailSource(),msgID,emailID,emailFrom
 					,emailSubject,emailTxtOnly,emailTxt,emailHtml,emailTimeStamp));
 			numberOfNewMsgs++;
+			orderedMessages.add(msgID);
 		}
 		return numberOfNewMsgs;
 	}
