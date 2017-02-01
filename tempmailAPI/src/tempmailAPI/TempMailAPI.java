@@ -18,6 +18,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.xml.parsers.*;
 import javax.net.ssl.HttpsURLConnection;
+import javax.sound.midi.SysexMessage;
+
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Node;
@@ -42,6 +44,7 @@ public class TempMailAPI {
 		sources = new ArrayList<URL>();
 		randomSet = "0123456789abcdefghijklmnopqrstuvwxyz!#$%&'*+-/=?^`{|}~";
 		domainOfSourceRelation = new HashMap<String,String>(); 
+		allMessages = new HashMap<String,Message>();
 		email = null;
 		
 		// adding sources 
@@ -58,12 +61,88 @@ public class TempMailAPI {
 		}
 		//stops execution if no domain found
 		if (sources.isEmpty()){throw new RuntimeException("No email domain found");}
-		generateEmail();
+		generateEmail("albocoder",0);
+		//System.out.println(email);
 		retrieveNewMessages();
 	}
 	
-	public void retrieveNewMessages(){
+	//returns the number of new messages it gets
+	public int retrieveNewMessages(){
 		//https://api.temp-mail.ru/request/mail/id/75740c1865965424b79a4787b60a9a5f/
+		StringBuilder requestURL = new StringBuilder("https://");
+		requestURL.append(this.getEmailSource());
+		requestURL.append("/request/mail/format/xml/id/");
+		requestURL.append(this.getMD5FromEmail());
+		//requestURL.append("/");
+		try {
+			URL destination = new URL(requestURL.toString());
+			HttpsURLConnection con = (HttpsURLConnection)destination.openConnection();
+			con.addRequestProperty("User-Agent", 
+					"Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.0)");
+			BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+		    String xmlData,line;
+		    StringBuilder dataBuilder = new StringBuilder();
+		    while ((line = in.readLine())!=null){
+		    	//System.out.println(line);
+		    	dataBuilder.append(line+"\n");
+		    }
+		    xmlData = dataBuilder.toString();
+		    try {
+		    	//System.out.println(xmlData);
+				return parseMsgFromXML(xmlData);
+			} catch (ParserConfigurationException | SAXException e) {
+				e.printStackTrace();
+				//System.err.println("Error in parsing: "+e.getMessage());
+				return 0;
+			}
+		} catch (MalformedURLException e) {
+			//e.printStackTrace();
+			System.err.println("Error in URL: "+e.getMessage());
+			return -1;
+		} catch (IOException e) {
+			//e.printStackTrace();
+			System.err.println("Error in opening connection: "+e.getMessage());
+			System.err.println("No Messages found or wrong response!");
+			return -1;
+		}
+		
+	}
+	private int parseMsgFromXML(String xmlData) throws ParserConfigurationException, SAXException, IOException{
+		int numberOfNewMsgs = 0;
+		Document doc = loadXMLFromString(xmlData);
+		doc.getDocumentElement().normalize();
+		NodeList nList = doc.getElementsByTagName("xml");
+		nList = nList.item(0).getChildNodes();
+		for (int temp = 0; temp < nList.getLength(); temp++) {
+			Node nNode = nList.item(temp);
+			Node inner = nNode.getFirstChild().getNextSibling();
+			String msgID = inner.getTextContent().trim();
+			if(allMessages.containsKey(msgID))
+				continue;
+			inner = inner.getNextSibling();
+			String emailID = inner.getTextContent().trim();
+			inner = inner.getNextSibling();
+			String emailFrom = inner.getTextContent().trim();
+			inner = inner.getNextSibling();
+			String emailSubject = inner.getTextContent().trim();
+			inner = inner.getNextSibling().getNextSibling();
+			String emailTxtOnly = inner.getTextContent().trim();
+			inner = inner.getNextSibling();
+			String emailTxt = inner.getTextContent().trim();
+			inner = inner.getNextSibling();
+			String emailHtml = inner.getTextContent().trim();
+			inner = inner.getNextSibling();
+			String emailTimeStamp = inner.getTextContent().trim();
+			
+			//put the message in the hashmap
+			allMessages.put(msgID, new Message(email,this.getEmailSource(),msgID,emailID,emailFrom
+					,emailSubject,emailTxtOnly,emailTxt,emailHtml,emailTimeStamp));
+			numberOfNewMsgs++;
+			System.out.println("msgID:\t"+msgID+"\nMailID:\t"+emailID+"\nFrom:\t"+emailFrom+"\nSubject:\t"+emailSubject);
+			System.out.println("mailTxtOnly:\t"+emailTxtOnly+"\nemailTxt:\t"+emailTxt+"\nemailHtml:\t"
+					+emailHtml+"\nepoch:\t"+emailTimeStamp+"\n\n");
+		}
+		return numberOfNewMsgs;
 	}
 	public void generateEmail(int nameLength){
 		Random randGen = new Random();
@@ -148,6 +227,7 @@ public class TempMailAPI {
 		}
 	}
 	private void dumpDomainsFromXml(String xmlData,int index) throws ParserConfigurationException, SAXException, IOException{
+		//System.out.println(xmlData);
 		Document doc = loadXMLFromString(xmlData);
 		doc.getDocumentElement().normalize();
 		//System.out.println("Root element: " 
