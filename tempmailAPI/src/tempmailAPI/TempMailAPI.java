@@ -12,13 +12,11 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.xml.parsers.*;
 import javax.net.ssl.HttpsURLConnection;
-import javax.sound.midi.SysexMessage;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
@@ -61,11 +59,45 @@ public class TempMailAPI {
 		}
 		//stops execution if no domain found
 		if (sources.isEmpty()){throw new RuntimeException("No email domain found");}
-		generateEmail("albocoder",0);
+		//generateEmail("albocoder",0);
+		generateEmail();
 		//System.out.println(email);
-		retrieveNewMessages();
+		//while(true){
+		//	try {
+		//		Thread.sleep(4000);
+		//	} catch (InterruptedException e) {e.printStackTrace();}
+		//	System.out.println(retrieveNewMessages());
+		//}
+		//System.out.println(deleteMessageOnline("ecf17fcb4e9274b181866ce610d46052"));
 	}
 	
+	//retrieve any message or all!
+	public boolean deleteMessageOnline(String id){
+		return deleteMsg(id,true);
+	}
+	public boolean deleteMessageTotally(String id){
+		return deleteMsg(id,false);
+	}
+	public boolean deleteMessageOffline(String id){
+		Message tmp = allMessages.remove(id);
+		if(tmp==null&&allMessages.isEmpty())
+			return true;
+		else if (tmp!=null)
+			return true;
+		return false;
+	}
+	private boolean deleteMsg(String id,boolean onlyOnline){
+		Message tmp = allMessages.get(id);
+		if(tmp==null)
+			return false;
+		
+		try{
+			return tmp.deleteMsg();
+		}finally{
+			if(!onlyOnline)
+				allMessages.remove(id);
+		}
+	}
 	//returns the number of new messages it gets
 	public int retrieveNewMessages(){
 		//https://api.temp-mail.ru/request/mail/id/75740c1865965424b79a4787b60a9a5f/
@@ -91,8 +123,8 @@ public class TempMailAPI {
 		    	//System.out.println(xmlData);
 				return parseMsgFromXML(xmlData);
 			} catch (ParserConfigurationException | SAXException e) {
-				e.printStackTrace();
-				//System.err.println("Error in parsing: "+e.getMessage());
+				//e.printStackTrace();
+				System.err.println("Error in parsing: "+e.getMessage());
 				return 0;
 			}
 		} catch (MalformedURLException e) {
@@ -105,7 +137,6 @@ public class TempMailAPI {
 			System.err.println("No Messages found or wrong response!");
 			return -1;
 		}
-		
 	}
 	private int parseMsgFromXML(String xmlData) throws ParserConfigurationException, SAXException, IOException{
 		int numberOfNewMsgs = 0;
@@ -138,9 +169,6 @@ public class TempMailAPI {
 			allMessages.put(msgID, new Message(email,this.getEmailSource(),msgID,emailID,emailFrom
 					,emailSubject,emailTxtOnly,emailTxt,emailHtml,emailTimeStamp));
 			numberOfNewMsgs++;
-			System.out.println("msgID:\t"+msgID+"\nMailID:\t"+emailID+"\nFrom:\t"+emailFrom+"\nSubject:\t"+emailSubject);
-			System.out.println("mailTxtOnly:\t"+emailTxtOnly+"\nemailTxt:\t"+emailTxt+"\nemailHtml:\t"
-					+emailHtml+"\nepoch:\t"+emailTimeStamp+"\n\n");
 		}
 		return numberOfNewMsgs;
 	}
