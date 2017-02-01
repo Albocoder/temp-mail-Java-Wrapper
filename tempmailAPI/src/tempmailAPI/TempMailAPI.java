@@ -71,7 +71,7 @@ public class TempMailAPI {
 		//System.out.println(deleteMessageOnline("ecf17fcb4e9274b181866ce610d46052"));
 	}
 	
-	//retrieve any message or all!
+	//TODO: retrieve any message or all!
 	public boolean deleteMessageOnline(String id){
 		return deleteMsg(id,true);
 	}
