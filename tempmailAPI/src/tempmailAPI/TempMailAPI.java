@@ -10,7 +10,9 @@ import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -22,20 +24,24 @@ import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
 
 public class TempMailAPI {
+	
 	private ArrayList<String> domains;
 	private ArrayList<URL> sources;
 	private String randomSet;
 	private String email;
+	private HashMap<String,String> domainOfSourceRelation;
+	private HashMap<String,Message> allMessages;
+	
+	//Constants 
 	private final int MAX_CHAR = 60;
-	//private final String ALLOWED_CHARS 
-	//	= "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&'*+-/=?^`{|}~";
 	private final Pattern domainPattern = Pattern.compile("^[0-9a-z!#$%&'*+-/=?^`{|}~]+$", Pattern.CASE_INSENSITIVE);
 	
 	public TempMailAPI() {
 		//initializing data
 		domains = new ArrayList<String>();
 		sources = new ArrayList<URL>();
-		randomSet = "0123456789abcdefghijklmnopqr]stuvwxyz!#$%&'*+-/=?^`{|}~";
+		randomSet = "0123456789abcdefghijklmnopqrstuvwxyz!#$%&'*+-/=?^`{|}~";
+		domainOfSourceRelation = new HashMap<String,String>(); 
 		email = null;
 		
 		// adding sources 
@@ -52,19 +58,20 @@ public class TempMailAPI {
 		}
 		//stops execution if no domain found
 		if (sources.isEmpty()){throw new RuntimeException("No email domain found");}
-		for(int i = 0; i< 10000; i++){
-			generateEmail();
-			if(!checkDomain(email.substring(0,email.indexOf("@"))))
-				System.out.println(email);
-		}
+		generateEmail();
+		retrieveNewMessages();
 	}
 	
-	//TODO: TEST THE METHODS BELOW
+	public void retrieveNewMessages(){
+		//https://api.temp-mail.ru/request/mail/id/75740c1865965424b79a4787b60a9a5f/
+	}
 	public void generateEmail(int nameLength){
 		Random randGen = new Random();
 		generateEmail(nameLength,randGen.nextInt(domains.size()));
 	}
 	public void generateEmail(int nameLength,int domainsIndex){
+		if(nameLength>MAX_CHAR)
+			throw new RuntimeException("Email name longer than 60 characters");
 		StringBuilder emailBuilder = new StringBuilder();
 		Random randGen = new Random();
 		for(int i = 0; i < nameLength; i++){
@@ -89,7 +96,6 @@ public class TempMailAPI {
 		Random randGen = new Random();
 		generateEmail(domain,randGen.nextInt(domains.size()));
 	}
-	// END OF TESTING TARGETS
 	public String getMD5FromEmail() {
 		if(email == null)
 			return null;
@@ -100,7 +106,6 @@ public class TempMailAPI {
 			//e.printStackTrace();
 			return null;
 		}
-		System.out.print("\tMD5: ");
 		try {
 			md.update(email.getBytes("iso-8859-1"));
 			byte byteData[] = md.digest();
@@ -121,10 +126,9 @@ public class TempMailAPI {
 	public void generateEmail(){
 		generateEmail(60);
 	}
-	
-	
 	public void dumpDomains() throws IOException, ParserConfigurationException, SAXException {
 		Iterator<URL> i = sources.iterator();
+		int index = 0;
 		while(i.hasNext()){
 			URL tmp = i.next();
 			HttpsURLConnection con = (HttpsURLConnection)tmp.openConnection();
@@ -138,11 +142,12 @@ public class TempMailAPI {
 		    	dataBuilder.append(line+"\n");
 		    }
 		    xmlData = dataBuilder.toString();
-		    dumpDomainsFromXml(xmlData);
+		    dumpDomainsFromXml(xmlData,index);
+		    index++;
 		    in.close();
 		}
 	}
-	private void dumpDomainsFromXml(String xmlData) throws ParserConfigurationException, SAXException, IOException{
+	private void dumpDomainsFromXml(String xmlData,int index) throws ParserConfigurationException, SAXException, IOException{
 		Document doc = loadXMLFromString(xmlData);
 		doc.getDocumentElement().normalize();
 		//System.out.println("Root element: " 
@@ -153,7 +158,12 @@ public class TempMailAPI {
 			Node nNode = nList.item(temp);
 			//System.out.print("\nCurrent Element: " 
 			//		+ nNode.getTextContent());
-			domains.add(nNode.getTextContent());
+			String parsedDomain = nNode.getTextContent();
+			String src = sources.get(index).toString();
+			int start = src.indexOf("://")+3;
+			domainOfSourceRelation.putIfAbsent(parsedDomain,src.substring(start,src.indexOf("/",start)));
+			if(!domains.contains(parsedDomain))
+				domains.add(parsedDomain);
 		}
 		//System.out.println("\n\n");
 	}
@@ -164,6 +174,11 @@ public class TempMailAPI {
 	    return builder.parse(new ByteArrayInputStream(xmlString.getBytes()));
 	}
 	//getters
+	public ArrayList<String> getDomains(){return domains;}
 	public String getPattern(){return domainPattern.pattern();}
 	public String getEmail(){return email;}
+	public String getEmailDomain(){return email.substring(email.indexOf("@"));}
+	public String getEmailSource(){return domainOfSourceRelation.get(this.getEmailDomain());}
+	//setters will corrupt relation domain of source then I will have to dumpDomains and remake the map
+	//public void setSources(ArrayList<URL> src){sources=src;}
 }
